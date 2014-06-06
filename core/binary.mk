@@ -186,6 +186,56 @@ endif
 
 my_compiler_dependencies :=
 
+#####################################################################################################
+## Copywrite (C) 2014 author Paul Beeler <pbeeler80@gmail.com>
+## begin pthread support
+# pthread needs static libs for the linker forced on some art modules with SaberMod host toolchains.
+# Add more modules here if needed.
+ifeq ($(USING_SABER_LINUX),yes)
+
+ifneq ($(filter $(THREADS_MODULE_LIST),$(LOCAL_MODULE)),)
+ifndef LOCAL_LDLIBS
+	LOCAL_LDLIBS := -ldl -lpthread
+else
+	LOCAL_LDLIBS += -ldl -lpthread
+endif
+ifeq ($(HOST_OS),linux)
+	LOCAL_LDLIBS += -lrt
+endif
+
+# Use C and CPP flags so it gets passed to the linker.
+LOCAL_CFLAGS += $(THREAD_FLAGS)
+LOCAL_CPPFLAGS += $(THREAD_FLAGS)
+endif
+## end pthread support
+#####################################################################################################
+## begin graphite
+
+# Graphite will not work very well with the -O3 flag.
+# To test -O3 with graphite remove the "ifneq ($(OPT_A_LOT),true)" and one "endif" below.
+# Add more modules here if needed.
+ifneq ($(OPT_A_LOT),true)
+ifeq ($(ENABLE_GRAPHITE),true)
+ifeq ($(filter $(DISABLE_GRAPHITE_MODULES),$(LOCAL_MODULE)),)
+	LOCAL_CFLAGS += -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear -floop-interchange -floop-strip-mine -floop-block
+	LOCAL_CPPFLAGS += -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear -floop-interchange -floop-strip-mine -floop-block
+endif
+endif
+endif
+endif
+## end graphite
+
+## begin strict-aliasing
+# modular strict-aliasing flags
+ifeq ($(MAKE_STRICT_GLOBAL),true)
+ifeq ($(filter $(DISABLE_STRICT_MODULES),$(LOCAL_MODULE)),)
+LOCAL_CFLAGS += $(STRICT_FLAGS)
+LOCAL_CPPFLAGS += $(STRICT_FLAGS)
+endif
+endif
+# end strict-aliasing
+
+
 ####################################################
 ## Add FDO flags if FDO is turned on and supported
 ####################################################
