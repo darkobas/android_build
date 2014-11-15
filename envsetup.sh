@@ -62,8 +62,8 @@ function check_product()
         return
     fi
 
-    if (echo -n $1 | grep -q -e "^dud") ; then
-       CUSTOM_BUILD=$(echo -n $1 | sed -e 's/^dud//g')
+    if (echo -n $1 | grep -q -e "^dud_") ; then
+       CUSTOM_BUILD=$(echo -n $1 | sed -e 's/^dud_//g')
     else
        CUSTOM_BUILD=
     fi
@@ -501,7 +501,7 @@ function breakfast()
     CUSTOM_DEVICES_ONLY="true"
     unset LUNCH_MENU_CHOICES
     add_lunch_combo full-eng
-    for f in `/bin/ls vendor/dud/vendorsetup.sh 2> /dev/null`
+    for f in `/bin/ls vendor/d_ud/vendorsetup.sh 2> /dev/null`
         do
             echo "including $f"
             . $f
@@ -521,7 +521,7 @@ function breakfast()
             if [ -z "$variant" ]; then
                 variant="userdebug"
             fi
-            lunch dud$target-$variant
+            lunch dud_$target-$variant
         fi
     fi
     return $?
