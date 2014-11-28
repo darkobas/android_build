@@ -680,6 +680,18 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
     script.ShowProgress(0.2, 10)
     script.RunBackup("restore")
 
+  if block_based:
+    script.Print("Flashing SuperSU...")
+    common.ZipWriteStr(output_zip, "supersu/supersu.zip",
+                   ""+input_zip.read("SYSTEM/addon.d/UPDATE-SuperSU.zip"))
+    script.Mount("/system")
+    script.FlashSuperSU()
+  else:
+    script.Print("Flashing SuperSU...")
+    common.ZipWriteStr(output_zip, "supersu/supersu.zip",
+                   ""+input_zip.read("SYSTEM/addon.d/UPDATE-SuperSU.zip"))
+    script.FlashSuperSU()  
+
   script.ShowProgress(0.2, 10)
   script.Print("Flashing boot.img")
   bootpartition = "/boot" if OPTIONS.override_boot_partition == "" else OPTIONS.override_boot_partition
