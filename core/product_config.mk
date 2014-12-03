@@ -179,9 +179,9 @@ include $(BUILD_SYSTEM)/node_fns.mk
 include $(BUILD_SYSTEM)/product.mk
 include $(BUILD_SYSTEM)/device.mk
 
-# A PA build needs only the PA product makefiles.
+# A PSD build needs only the PSD product makefiles.
 ifneq ($(PSD_BUILD),)
-  all_product_configs := $(shell ls vendor/pa/products/pa_$(PSD_BUILD).mk)
+  all_product_configs := $(shell ls vendor/psd/products/psd_$(PSD_BUILD).mk)
 else
   ifneq ($(strip $(TARGET_BUILD_APPS)),)
   # An unbundled app build needs only the core product makefiles.

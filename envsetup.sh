@@ -64,8 +64,8 @@ function check_product()
         return
     fi
 
-    if (echo -n $1 | grep -q -e "^pa_") ; then
-       PSD_BUILD=$(echo -n $1 | sed -e 's/^pa_//g')
+    if (echo -n $1 | grep -q -e "^psd_") ; then
+       PSD_BUILD=$(echo -n $1 | sed -e 's/^psd_//g')
        export BUILD_NUMBER=$((date +%s%N ; echo $PSD_BUILD; hostname) | openssl sha1 | sed -e 's/.*=//g; s/ //g' | cut -c1-10)
     else
        PSD_BUILD=
