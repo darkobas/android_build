@@ -1597,11 +1597,11 @@ ifneq ($(recovery_fstab),)
 # -----------------------------------------------------------------
 # OTA update package
 
-name := $(TARGET_PRODUCT)-$(PSD_BUILD)
+name := $(TARGET_PRODUCT)
 ifeq ($(TARGET_BUILD_TYPE),debug)
   name := $(name)_debug
 endif
-#name := $(name)-ota-$(FILE_NAME_TAG)-$(DATE)
+name := $(name)-ota-$(FILE_NAME_TAG)-$(DATE)
 
 INTERNAL_OTA_PACKAGE_TARGET := $(PRODUCT_OUT)/$(name).zip
 
@@ -1647,7 +1647,7 @@ $(INTERNAL_OTA_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS)
 	   $(if $(OEM_OTA_CONFIG), -o $(OEM_OTA_CONFIG)) \
 	   $(BUILT_TARGET_FILES_PACKAGE) $@
 
-PSD_TARGET_PACKAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT)-$(name).zip
+PSD_TARGET_PACKAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT)-$(PSD_BUILD_NAME).zip
 
 .PHONY: otapackage bacon
 otapackage: $(INTERNAL_OTA_PACKAGE_TARGET)
