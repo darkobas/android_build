@@ -13,8 +13,8 @@ $(all_objects) : PRIVATE_TARGET_GLOBAL_CFLAGS :=
 $(all_objects) : PRIVATE_TARGET_GLOBAL_CPPFLAGS :=
 
 $(LOCAL_BUILT_MODULE): $(all_objects) $(all_libraries)
-	@$(mkdir -p $(dir $@)
-	@echo -e ${PRT_TGT}"target Linking:"${CL_RST}" $(PRIVATE_MODULE)"
+	$(hide) $(mkdir -p $(dir $@)
+	@echo -e ${CL_GRN}"target Linking:"${CL_RST}" $(PRIVATE_MODULE)"
 	$(hide) $(TARGET_LD) \
 		$(addprefix --script ,$(PRIVATE_LINK_SCRIPT)) \
 		$(PRIVATE_RAW_EXECUTABLE_LDFLAGS) \
