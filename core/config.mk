@@ -485,6 +485,10 @@ else
   DEFAULT_SYSTEM_DEV_CERTIFICATE := build/target/product/security/testkey
 endif
 
+include $(BUILD_SYSTEM)/qcom_target.mk
+
+
+
 # ###############################################################
 # Set up final options.
 # ###############################################################
@@ -505,10 +509,10 @@ HOST_GLOBAL_LD_DIRS += -L$(HOST_OUT_INTERMEDIATE_LIBRARIES)
 TARGET_GLOBAL_LD_DIRS += -L$(TARGET_OUT_INTERMEDIATE_LIBRARIES)
 
 HOST_PROJECT_INCLUDES:= $(SRC_HEADERS) $(SRC_HOST_HEADERS) $(HOST_OUT_HEADERS)
-TARGET_PROJECT_INCLUDES:= $(SRC_HEADERS) $(TARGET_OUT_HEADERS) \
+TARGET_PROJECT_INCLUDES:= $(TOPDIR)$(call project-path-for,ril)/include
+TARGET_PROJECT_INCLUDES+= $(SRC_HEADERS) $(TARGET_OUT_HEADERS) \
 		$(TARGET_DEVICE_KERNEL_HEADERS) $(TARGET_BOARD_KERNEL_HEADERS) \
-		$(TARGET_PRODUCT_KERNEL_HEADERS) \
-		$(TOPDIR)$(call project-path-for,ril)/include
+		$(TARGET_PRODUCT_KERNEL_HEADERS)
 
 # Many host compilers don't support these flags, so we have to make
 # sure to only specify them for the target compilers checked in to
@@ -621,9 +625,6 @@ endif
 RS_PREBUILT_CLCORE := prebuilts/sdk/renderscript/lib/$(TARGET_ARCH)/librsrt_$(TARGET_ARCH).bc
 RS_PREBUILT_LIBPATH := -L prebuilts/ndk/8/platforms/android-9/arch-$(TARGET_ARCH)/usr/lib
 RS_PREBUILT_COMPILER_RT := prebuilts/sdk/renderscript/lib/$(TARGET_ARCH)/libcompiler_rt.a
-
-# Rules for QCOM targets
-include $(BUILD_SYSTEM)/qcom_target.mk
 
 ## ifneq ($(CM_BUILD),)
 ## We need to be sure the global selinux policies are included
