@@ -21,7 +21,6 @@
 
 ifneq ($(TARGET_LOW_RAM_DEVICE), true)
 PRODUCT_PACKAGES := \
-    VoiceDialer \
     libsrec_jni
 endif
 
