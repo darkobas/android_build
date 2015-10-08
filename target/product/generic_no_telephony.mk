@@ -20,8 +20,7 @@
 PRODUCT_PACKAGES := \
     Bluetooth \
     BluetoothMidiService \
-    Camera2 \
-    Gallery2 \
+    allery2 \
     InputDevices \
     Keyguard \
     LatinIME \
