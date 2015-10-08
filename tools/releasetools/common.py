@@ -1366,16 +1366,17 @@ DataImage = blockimgdiff.DataImage
 
 
 # map recovery.fstab's fs_types to mount/format "partition types"
-PARTITION_TYPES = { "bml": "BML",
-                    "ext2": "EMMC",
-                    "ext3": "EMMC",
-                    "ext4": "EMMC",
-                    "emmc": "EMMC",
-                    "mtd": "MTD",
-                    "f2fs": "EMMC",
-                    "yaffs2": "MTD",
-                    "vfat": "EMMC",
-                    "squashfs": "EMMC" }
+PARTITION_TYPES = {
+    "yaffs2": "MTD",
+    "mtd": "MTD",
+    "ext4": "EMMC",
+    "emmc": "EMMC",
+    "f2fs": "EMMC",
+    "squashfs": "EMMC",
+    "ext2": "EMMC",
+    "ext3": "EMMC",
+    "vfat": "EMMC"
+}
 
 def GetTypeAndDevice(mount_point, info):
   fstab = info["fstab"]

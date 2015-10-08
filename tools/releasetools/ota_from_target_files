@@ -1551,6 +1551,7 @@ def main(argv):
 
   args = common.ParseOptions(argv, __doc__,
                              extra_opts="b:k:i:d:wne:t:a:2o:",
+<<<<<<< HEAD
                              extra_long_opts=["board_config=",
                                               "package_key=",
                                               "incremental_from=",
@@ -1573,6 +1574,29 @@ def main(argv):
                                               "no_fallback_to_full",
                                               ],
                              extra_option_handler=option_handler)
+=======
+                             extra_long_opts=[
+                                 "board_config=",
+                                 "package_key=",
+                                 "incremental_from=",
+                                 "full_radio",
+                                 "wipe_user_data",
+                                 "no_prereq",
+                                 "extra_script=",
+                                 "worker_threads=",
+                                 "aslr_mode=",
+                                 "two_step",
+                                 "no_signing",
+                                 "block",
+                                 "binary=",
+                                 "oem_settings=",
+                                 "verify",
+                                 "no_fallback_to_full",
+                                 "backup=",
+                                 "override_device=",
+                                 "override_prop="
+                             ], extra_option_handler=option_handler)
+>>>>>>> 9f65758... Fix syntax issues and recovery generation
 
   if len(args) != 2:
     common.Usage(__doc__)
