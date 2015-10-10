@@ -17,6 +17,9 @@ ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
     TARGET_USES_QCOM_BSP := true
     TARGET_ENABLE_QC_AV_ENHANCEMENTS := true
 
+    # Tell HALs that we're compiling an AOSP build with an in-line kernel
+    TARGET_COMPILE_WITH_MSM_KERNEL := true
+
     TARGET_GLOBAL_CFLAGS += $(qcom_flags)
     TARGET_GLOBAL_CPPFLAGS += $(qcom_flags)
     CLANG_TARGET_GLOBAL_CFLAGS += $(qcom_flags)
