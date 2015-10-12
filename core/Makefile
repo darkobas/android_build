@@ -953,14 +953,28 @@ define build-recoveryimage-target
   $(hide) cp $(RECOVERY_INSTALL_OTA_KEYS) $(TARGET_RECOVERY_ROOT_OUT)/res/keys
   $(hide) cat $(INSTALLED_DEFAULT_PROP_TARGET) $(recovery_build_prop) \
           > $(TARGET_RECOVERY_ROOT_OUT)/default.prop
-  $(hide) $(SED_INPLACE) 's/ro.build.date.utc=.*/ro.build.date.utc=0/g' $(TARGET_RECOVERY_ROOT_OUT)/default.prop
-  $(hide) $(SED_INPLACE) 's/ro.adb.secure=1/ro.adb.secure=0/g' $(TARGET_RECOVERY_ROOT_OUT)/default.prop
+
+  $(if $(filter $(BOARD_CUSTOM_BOOTIMG_MK),),
+    $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VBOOT)), \
+      $(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(1).unsigned, \
+      $(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(1) --id > $(RECOVERYIMAGE_ID_FILE))
+    $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_BOOT_SIGNER)),\
+      $(BOOT_SIGNER) /recovery $(1) $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).pk8 $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).x509.pem $(1))
+    $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VBOOT)), \
+      $(VBOOT_SIGNER) $(FUTILITY) $(1).unsigned $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VBOOT_SIGNING_KEY).vbpubk $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VBOOT_SIGNING_KEY).vbprivk $(1).keyblock $(1))
+    $(hide) $(call assert-max-image-size,$(1),$(BOARD_RECOVERYIMAGE_PARTITION_SIZE)))
+  @echo -e ${CL_CYN}"Made recovery image: $@"${CL_RST}
 endef
 
-$(recovery_uncompressed_ramdisk): $(MKBOOTFS) \
+$(recovery_uncompressed_ramdisk): $(MINIGZIP) $(recovery_ramdisk)
+	@echo -e ${CL_CYN}"----- Making uncompressed recovery ramdisk ------"${CL_RST}
+	$(MKBOOTFS) $(TARGET_RECOVERY_ROOT_OUT) > $@
+
+$(recovery_ramdisk): $(MKBOOTFS) $(MKBOOTIMG) $(MINIGZIP) $(RECOVERYIMAGE_EXTRA_DEPS) \
+		$(INSTALLED_RAMDISK_TARGET) \
 		$(INSTALLED_BOOTIMAGE_TARGET) \
 		$(INTERNAL_RECOVERYIMAGE_FILES) \
-		$(recovery_initrc) $(recovery_sepolicy) $(recovery_kernel) \
+		$(recovery_initrc) $(recovery_sepolicy) \
 		$(INSTALLED_2NDBOOTLOADER_TARGET) \
 		$(recovery_build_prop) $(recovery_resource_deps) $(recovery_root_deps) \
 		$(recovery_fstab) \
@@ -975,18 +989,64 @@ $(recovery_ramdisk): $(MKBOOTFS) \
 	$(hide) $(MINIGZIP) < $(recovery_uncompressed_ramdisk) > $@
 
 ifndef BOARD_CUSTOM_BOOTIMG_MK
-$(INSTALLED_RECOVERYIMAGE_TARGET): $(recovery_ramdisk) $(MKBOOTIMG) $(recovery_kernel)
-	@echo -e ${PRT_IMG}"----- Making recovery image ------"${CL_RST}
-	$(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $@
-	$(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VBOOT)), \
-		$(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(1).unsigned, \
-		$(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(1) --id > $(RECOVERYIMAGE_ID_FILE))
-	$(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_BOOT_SIGNER)),\
-		$(BOOT_SIGNER) /recovery $(1) $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).pk8 $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).x509.pem $(1))
-	$(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VBOOT)), \
-		$(VBOOT_SIGNER) $(FUTILITY) $(1).unsigned $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VBOOT_SIGNING_KEY).vbpubk $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VBOOT_SIGNING_KEY).vbprivk $(1).keyblock $(1))
-	$(hide) $(call assert-max-image-size,$(1),$(BOARD_RECOVERYIMAGE_PARTITION_SIZE))
-	@echo -e ${PRT_IMG}"----- Made recovery image: $@ --------"${CL_RST}
+$(INSTALLED_RECOVERYIMAGE_TARGET): $(recovery_ramdisk) $(recovery_kernel)
+endif # BOARD_CUSTOM_BOOTIMG_MK
+
+recovery_patch_path := $(call intermediates-dir-for,PACKAGING,recovery_patch)
+ota_temp_root := $(PRODUCT_OUT)/ota_temp
+$(RECOVERY_PATCH_INSTALL): PRIVATE_RECOVERY_API_VERSION := $(RECOVERY_API_VERSION)
+$(RECOVERY_PATCH_INSTALL): PRIVATE_RECOVERY_FSTAB_VERSION := $(RECOVERY_FSTAB_VERSION)
+$(RECOVERY_PATCH_INSTALL): $(INSTALLED_RECOVERYIMAGE_TARGET) \
+	$(RECOVERY_FROM_BOOT_PATCH) \
+	$(ALL_PREBUILT) \
+	$(ALL_COPIED_HEADERS) \
+	$(ALL_GENERATED_SOURCES) \
+	$(ALL_DEFAULT_INSTALLED_MODULES) \
+	$(PDK_FUSION_SYSIMG_FILES)
+	@echo "Installing recovery patch to system partition"
+	$(hide) mkdir -p $(ota_temp_root)
+	$(hide) mkdir -p $(ota_temp_root)/BOOT
+	$(hide) mkdir -p $(ota_temp_root)/RECOVERY
+	$(hide) mkdir -p $(ota_temp_root)/BOOTABLE_IMAGES
+	$(hide) mkdir -p $(ota_temp_root)/SYSTEM
+	$(hide) mkdir -p $(ota_temp_root)/SYSTEM/bin
+	$(hide) mkdir -p $(ota_temp_root)/SYSTEM/etc
+	$(hide) mkdir -p $(ota_temp_root)/META
+	$(hide) $(call package_files-copy-root, \
+		$(TARGET_RECOVERY_ROOT_OUT),$(ota_temp_root)/RECOVERY/RAMDISK)
+	$(hide) $(call package_files-copy-root, \
+		$(TARGET_ROOT_OUT),$(ota_temp_root)/BOOT/RAMDISK)
+	$(hide) $(call package_files-copy-root, \
+		$(TARGET_OUT)/etc,$(ota_temp_root)/SYSTEM/etc)
+	@echo "recovery_api_version=$(PRIVATE_RECOVERY_API_VERSION)" > $(ota_temp_root)/META/misc_info.txt
+	@echo "fstab_version=$(PRIVATE_RECOVERY_FSTAB_VERSION)" >> $(ota_temp_root)/META/misc_info.txt
+ifdef BOARD_FLASH_BLOCK_SIZE
+	@echo "blocksize=$(BOARD_FLASH_BLOCK_SIZE)" >> $(ota_temp_root)/META/misc_info.txt
+endif
+ifdef BOARD_BOOTIMAGE_PARTITION_SIZE
+	@echo "boot_size=$(BOARD_BOOTIMAGE_PARTITION_SIZE)" >> $(ota_temp_root)/META/misc_info.txt
+endif
+ifdef BOARD_RECOVERYIMAGE_PARTITION_SIZE
+	@echo "recovery_size=$(BOARD_RECOVERYIMAGE_PARTITION_SIZE)" >> $(ota_temp_root)/META/misc_info.txt
+endif
+ifdef TARGET_RECOVERY_FSTYPE_MOUNT_OPTIONS
+	@# TARGET_RECOVERY_FSTYPE_MOUNT_OPTIONS can be empty to indicate that nothing but defaults should be used.
+	@echo "recovery_mount_options=$(TARGET_RECOVERY_FSTYPE_MOUNT_OPTIONS)" >> $(ota_temp_root)/META/misc_info.txt
+else
+	@echo "recovery_mount_options=$(DEFAULT_TARGET_RECOVERY_FSTYPE_MOUNT_OPTIONS)" >> $(ota_temp_root)/META/misc_info.txt
+endif
+	@echo "tool_extensions=$(tool_extensions)" >> $(ota_temp_root)/META/misc_info.txt
+	@echo "default_system_dev_certificate=$(DEFAULT_SYSTEM_DEV_CERTIFICATE)" >> $(ota_temp_root)/META/misc_info.txt
+ifdef PRODUCT_EXTRA_RECOVERY_KEYS
+	@echo "extra_recovery_keys=$(PRODUCT_EXTRA_RECOVERY_KEYS)" >> $(ota_temp_root)/META/misc_info.txt
+endif
+	@echo 'mkbootimg_args=$(BOARD_MKBOOTIMG_ARGS)' >> $(ota_temp_root)/META/misc_info.txt
+	@echo "use_set_metadata=1" >> $(ota_temp_root)/META/misc_info.txt
+	@echo "multistage_support=1" >> $(ota_temp_root)/META/misc_info.txt
+	@echo "update_rename_support=1" >> $(ota_temp_root)/META/misc_info.txt
+ifneq ($(OEM_THUMBPRINT_PROPERTIES),)
+	# OTA scripts are only interested in fingerprint related properties
+	@echo "oem_fingerprint_properties=$(OEM_THUMBPRINT_PROPERTIES)" >> $(ota_temp_root)/META/misc_info.txt
 endif
 
 $(RECOVERY_RESOURCE_ZIP): $(INSTALLED_RECOVERYIMAGE_TARGET)
