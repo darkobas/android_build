@@ -177,7 +177,6 @@ function setpaths()
         arm)
             # Legacy toolchain configuration used for ARM kernel compilation
             toolchaindir=arm/arm-eabi-$targetlegacygccversion/bin
-            export PATH=$(pwd)/prebuilts/gcc/linux-x86/$toolchaindir/bin:$PATH
             if [ -d "$gccprebuiltdir/$toolchaindir" ]; then
                  export ARM_EABI_TOOLCHAIN="$gccprebuiltdir/$toolchaindir"
                  ANDROID_KERNEL_TOOLCHAIN_PATH="$ARM_EABI_TOOLCHAIN":
