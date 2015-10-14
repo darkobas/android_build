@@ -574,7 +574,7 @@ HOST_PROJECT_INCLUDES:= $(SRC_HEADERS) $(SRC_HOST_HEADERS) $(HOST_OUT_HEADERS)
 
 ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
 TARGET_AV_HEADERS := \
-        frameworks/av-caf/include
+        frameworks/av/include
 else
 TARGET_AV_HEADERS := \
         frameworks/av/include
