@@ -827,19 +827,28 @@ else
   recovery_kernel := $(INSTALLED_KERNEL_TARGET) # same as a non-recovery system
 endif
 recovery_uncompressed_ramdisk := $(PRODUCT_OUT)/ramdisk-recovery.cpio
+
+#recovery_initrc := $(call project-path-for,recovery)/etc/init.rc
 recovery_sepolicy := $(call intermediates-dir-for,ETC,sepolicy.recovery)/sepolicy.recovery
+#recovery_kernel := $(INSTALLED_KERNEL_TARGET) # same as a non-recovery system
 recovery_ramdisk := $(PRODUCT_OUT)/ramdisk-recovery.img
 recovery_build_prop := $(intermediate_system_build_prop)
+recovery_uncompressed_ramdisk := $(PRODUCT_OUT)/ramdisk-recovery.cpio
 recovery_resources_common := $(call include-path-for, recovery)/res
+#recovery_resources_common := $(call project-path-for,recovery)/res
 
 # Set recovery_density to the density bucket of the device.
 recovery_density := unknown
+ifneq (,$(TARGET_RECOVERY_DENSITY))
+recovery_density := $(filter %dpi,$(TARGET_RECOVERY_DENSITY))
+else
 ifneq (,$(PRODUCT_AAPT_PREF_CONFIG))
 # If PRODUCT_AAPT_PREF_CONFIG includes a dpi bucket, then use that value.
 recovery_density := $(filter %dpi,$(PRODUCT_AAPT_PREF_CONFIG))
 else
 # Otherwise, use the default medium density.
 recovery_densities := mdpi
+endif
 endif
 
 ifneq (,$(wildcard $(recovery_resources_common)-$(recovery_density)))
@@ -896,6 +905,11 @@ INTERNAL_RECOVERYIMAGE_ARGS := \
 
 # Assumes this has already been stripped
 ifdef BOARD_KERNEL_CMDLINE
+  ifdef BUILD_ENFORCE_SELINUX
+      ifneq (,$(filter androidboot.selinux=permissive androidboot.selinux=disabled, $(BOARD_KERNEL_CMDLINE)))
+          $(error "Trying to apply non-default selinux settings. Aborting")
+      endif
+  endif
   INTERNAL_RECOVERYIMAGE_ARGS += --cmdline "$(BOARD_KERNEL_CMDLINE)"
 endif
 ifdef BOARD_KERNEL_BASE
@@ -906,14 +920,20 @@ ifdef BOARD_KERNEL_PAGESIZE
   INTERNAL_RECOVERYIMAGE_ARGS += --pagesize $(BOARD_KERNEL_PAGESIZE)
 endif
 
-INTERNAL_RECOVERY_FILES := $(filter $(TARGET_RECOVERY_OUT)/%, \
-	$(foreach module, $(ALL_MODULES), $(ALL_MODULES.$(module).INSTALLED)) \
-	$(ALL_DEFAULT_INSTALLED_MODULES))
-
 # Keys authorized to sign OTA packages this build will accept.  The
 # build always uses dev-keys for this; release packaging tools will
 # substitute other keys for this one.
 OTA_PUBLIC_KEYS := $(DEFAULT_SYSTEM_DEV_CERTIFICATE).x509.pem
+
+ifneq ($(OTA_PACKAGE_SIGNING_KEY),)
+    OTA_PUBLIC_KEYS := $(OTA_PACKAGE_SIGNING_KEY).x509.pem
+    PRODUCT_EXTRA_RECOVERY_KEYS := $(DEFAULT_SYSTEM_DEV_CERTIFICATE)
+else
+    PRODUCT_EXTRA_RECOVERY_KEYS += \
+        build/target/product/security/cm \
+        build/target/product/security/cm-devkey \
+        build/target/product/security/bacon
+endif
 
 # Generate a file containing the keys that will be read by the
 # recovery binary.
@@ -923,7 +943,7 @@ DUMPKEY_JAR := $(HOST_OUT_JAVA_LIBRARIES)/dumpkey.jar
 $(RECOVERY_INSTALL_OTA_KEYS): PRIVATE_OTA_PUBLIC_KEYS := $(OTA_PUBLIC_KEYS)
 $(RECOVERY_INSTALL_OTA_KEYS): extra_keys := $(patsubst %,%.x509.pem,$(PRODUCT_EXTRA_RECOVERY_KEYS))
 $(RECOVERY_INSTALL_OTA_KEYS): $(OTA_PUBLIC_KEYS) $(DUMPKEY_JAR) $(extra_keys)
-	@echo -e ${PRT_INS}"DumpPublicKey: $@ <= $(PRIVATE_OTA_PUBLIC_KEYS) $(extra_keys)"${CL_RST}
+	@echo "DumpPublicKey: $@ <= $(PRIVATE_OTA_PUBLIC_KEYS) $(extra_keys)"
 	@rm -rf $@
 	@mkdir -p $(dir $@)
 	java -jar $(DUMPKEY_JAR) $(PRIVATE_OTA_PUBLIC_KEYS) $(extra_keys) > $@
@@ -931,12 +951,12 @@ $(RECOVERY_INSTALL_OTA_KEYS): $(OTA_PUBLIC_KEYS) $(DUMPKEY_JAR) $(extra_keys)
 RECOVERYIMAGE_ID_FILE := $(PRODUCT_OUT)/recovery.id
 # $(1): output file
 define build-recoveryimage-target
-  @echo -e ${PRT_IMG}"----- Making recovery image ------"${CL_RST}
+  @echo -e ${CL_CYN}"----- Making recovery image ------"${CL_RST}
   $(hide) mkdir -p $(TARGET_RECOVERY_OUT)
   $(hide) mkdir -p $(TARGET_RECOVERY_ROOT_OUT)/etc $(TARGET_RECOVERY_ROOT_OUT)/tmp
-  @echo -e ${PRT_IMG}"Copying baseline ramdisk..."${CL_RST}
+  @echo -e ${CL_CYN}"Copying baseline ramdisk..."${CL_RST}
   $(hide) rsync -a $(TARGET_ROOT_OUT) $(TARGET_RECOVERY_OUT) # "cp -Rf" fails to overwrite broken symlinks on Mac.
-  @echo -e ${PRT_IMG}"Modifying ramdisk contents..."${CL_RST}
+  @echo -e ${CL_CYN}"Modifying ramdisk contents..."${CL_RST}
   $(hide) rm -f $(TARGET_RECOVERY_ROOT_OUT)/init*.rc
   $(hide) cp -f $(recovery_initrc) $(TARGET_RECOVERY_ROOT_OUT)/
   $(hide) rm -f $(TARGET_RECOVERY_ROOT_OUT)/sepolicy
@@ -955,15 +975,17 @@ define build-recoveryimage-target
   $(hide) cp $(RECOVERY_INSTALL_OTA_KEYS) $(TARGET_RECOVERY_ROOT_OUT)/res/keys
   $(hide) cat $(INSTALLED_DEFAULT_PROP_TARGET) $(recovery_build_prop) \
           > $(TARGET_RECOVERY_ROOT_OUT)/default.prop
-  $(hide) $(MKBOOTFS) $(TARGET_RECOVERY_ROOT_OUT) | $(MINIGZIP) > $(recovery_ramdisk)
-  $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VBOOT)), \
-    $(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(1).unsigned, \
-    $(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(1) --id > $(RECOVERYIMAGE_ID_FILE))
-  $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_BOOT_SIGNER)),\
-    $(BOOT_SIGNER) /recovery $(1) $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).pk8 $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).x509.pem $(1))
-  $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VBOOT)), \
-    $(VBOOT_SIGNER) $(FUTILITY) $(1).unsigned $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VBOOT_SIGNING_KEY).vbpubk $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VBOOT_SIGNING_KEY).vbprivk $(1).keyblock $(1))
-  $(hide) $(call assert-max-image-size,$(1),$(BOARD_RECOVERYIMAGE_PARTITION_SIZE))
+  $(hide) $(MKBOOTFS) -d $(TARGET_OUT) $(TARGET_RECOVERY_ROOT_OUT) | $(MINIGZIP) > $(recovery_ramdisk)
+
+  $(if !$(BOARD_CUSTOM_BOOTIMG_MK),
+    $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VBOOT)), \
+      $(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(1).unsigned, \
+      $(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(1) --id > $(RECOVERYIMAGE_ID_FILE))
+    $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_BOOT_SIGNER)),\
+      $(BOOT_SIGNER) /recovery $(1) $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).pk8 $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).x509.pem $(1))
+    $(if $(filter true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VBOOT)), \
+      $(VBOOT_SIGNER) $(FUTILITY) $(1).unsigned $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VBOOT_SIGNING_KEY).vbpubk $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VBOOT_SIGNING_KEY).vbprivk $(1).keyblock $(1))
+    $(hide) $(call assert-max-image-size,$(1),$(BOARD_RECOVERYIMAGE_PARTITION_SIZE)))
   @echo -e ${CL_CYN}"Made recovery image: $@"${CL_RST}
 endef
 
@@ -971,7 +993,7 @@ $(recovery_uncompressed_ramdisk): $(MINIGZIP) $(recovery_ramdisk)
 	@echo -e ${CL_CYN}"----- Making uncompressed recovery ramdisk ------"${CL_RST}
 	$(MKBOOTFS) $(TARGET_RECOVERY_ROOT_OUT) > $@
 
-$(recovery_ramdisk): $(MKBOOTFS) $(MINIGZIP) $(RECOVERYIMAGE_EXTRA_DEPS) \
+$(recovery_ramdisk): $(MKBOOTFS) $(MINIGZIP) \
 		$(INSTALLED_RAMDISK_TARGET) \
 		$(INSTALLED_BOOTIMAGE_TARGET) \
 		$(INTERNAL_RECOVERYIMAGE_FILES) \
@@ -980,17 +1002,10 @@ $(recovery_ramdisk): $(MKBOOTFS) $(MINIGZIP) $(RECOVERYIMAGE_EXTRA_DEPS) \
 		$(recovery_build_prop) $(recovery_resource_deps) $(recovery_root_deps) \
 		$(recovery_fstab) \
 		$(RECOVERY_INSTALL_OTA_KEYS)
-	$(call build-recoveryimage-target, $@)
-	@echo -e ${PRT_IMG}"----- Making uncompressed recovery ramdisk ------"${CL_RST}
-	$(hide) $(MKBOOTFS) $(TARGET_RECOVERY_ROOT_OUT) > $@
-
-$(recovery_ramdisk): $(MKBOOTFS) \
-	$(recovery_uncompressed_ramdisk)
-	@echo -e ${PRT_IMG}"----- Making compressed recovery ramdisk ------"${CL_RST}
-	$(hide) $(MINIGZIP) < $(recovery_uncompressed_ramdisk) > $@
 
 ifndef BOARD_CUSTOM_BOOTIMG_MK
-$(INSTALLED_RECOVERYIMAGE_TARGET): $(recovery_ramdisk) $(recovery_kernel)
+$(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTIMG) $(recovery_ramdisk) $(recovery_kernel)
+		$(call build-recoveryimage-target, $@)
 endif # BOARD_CUSTOM_BOOTIMG_MK
 
 recovery_patch_path := $(call intermediates-dir-for,PACKAGING,recovery_patch)
@@ -1352,27 +1367,6 @@ userdataimage-nodeps: | $(INTERNAL_USERIMAGES_DEPS)
 endif # not skip_userdata.img
 skip_userdata.img :=
 
-#######
-## data partition tarball
-define build-userdatatarball-target
-    $(call pretty,"Target userdata fs tarball: " \
-                  "$(INSTALLED_USERDATATARBALL_TARGET)")
-    $(MKTARBALL) $(FS_GET_STATS) \
-		$(PRODUCT_OUT) data $(PRIVATE_USERDATA_TAR) \
-		$(INSTALLED_USERDATATARBALL_TARGET) $(TARGET_OUT)
-endef
-
-userdata_tar := $(PRODUCT_OUT)/userdata.tar
-INSTALLED_USERDATATARBALL_TARGET := $(userdata_tar).bz2
-$(INSTALLED_USERDATATARBALL_TARGET): PRIVATE_USERDATA_TAR := $(userdata_tar)
-$(INSTALLED_USERDATATARBALL_TARGET): $(FS_GET_STATS) $(INTERNAL_USERDATAIMAGE_FILES)
-	$(build-userdatatarball-target)
-
-.PHONY: userdatatarball-nodeps
-userdatatarball-nodeps: $(FS_GET_STATS)
-	$(build-userdatatarball-target)
-
-
 # -----------------------------------------------------------------
 # cache partition image
 ifdef BOARD_CACHEIMAGE_FILE_SYSTEM_TYPE
@@ -1594,8 +1588,6 @@ $(BUILT_TARGET_FILES_PACKAGE): \
 	$(hide) mkdir -p $(zip_root)/RECOVERY
 	$(hide) $(call package_files-copy-root, \
 		$(TARGET_RECOVERY_ROOT_OUT),$(zip_root)/RECOVERY/RAMDISK)
-	@# OTA install helpers
-	$(hide) $(call package_files-copy-root, $(OUT)/install, $(zip_root)/INSTALL)
 # Just copy the already built boot/recovery images into the target-files dir
 # in order to avoid mismatched images between the out dir and what the ota
 # build system tries to rebuild.

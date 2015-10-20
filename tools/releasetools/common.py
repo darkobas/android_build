@@ -225,10 +225,10 @@ def LoadRecoveryFSTab(read_helper, fstab_version, type):
       if not line or line.startswith("#"):
         continue
       pieces = line.split()
-      if not (3 <= len(pieces) <= 7):
+      if not 3 <= len(pieces) <= 4:
         raise ValueError("malformed recovery.fstab line: \"%s\"" % (line,))
       options = None
-      if len(pieces) >= 4 and pieces[3] != 'NULL':
+      if len(pieces) >= 4:
         if pieces[3].startswith("/"):
           device2 = pieces[3]
           if len(pieces) >= 5:
@@ -449,13 +449,7 @@ def GetBootableImage(name, prebuilt_name, unpack_dir, tree_subdir,
   otherwise construct it from the source files in
   'unpack_dir'/'tree_subdir'."""
 
-  prebuilt_dir = os.path.join(unpack_dir, "BOOTABLE_IMAGES")
-  prebuilt_path = os.path.join(prebuilt_dir, prebuilt_name)
-  custom_bootimg_mk = os.getenv('MKBOOTIMG')
-  if custom_bootimg_mk:
-    bootimage_path = os.path.join(os.getenv('OUT'), "boot.img")
-    os.mkdir(prebuilt_dir)
-    shutil.copyfile(bootimage_path, prebuilt_path)
+  prebuilt_path = os.path.join(unpack_dir, "BOOTABLE_IMAGES", prebuilt_name)
   if os.path.exists(prebuilt_path):
     print "using prebuilt %s from BOOTABLE_IMAGES..." % (prebuilt_name,)
     return File.FromLocalFile(name, prebuilt_path)
@@ -489,6 +483,7 @@ def UnzipTemp(filename, pattern=None):
   OPTIONS.tempfiles.append(tmp)
 
   def unzip_to_dir(filename, dirname):
+    subprocess.call(["rm", "-rf", dirname + filename, "targetfiles-*"])
     cmd = ["unzip", "-o", "-q", filename, "-d", dirname]
     if pattern is not None:
       cmd.append(pattern)
@@ -1026,6 +1021,11 @@ class DeviceSpecificParams(object):
     used to install the image for the device's baseband processor."""
     return self._DoCall("FullOTA_InstallEnd")
 
+  def FullOTA_PostValidate(self):
+    """Called after installing and validating /system; typically this is
+    used to resize the system partition after a block based installation."""
+    return self._DoCall("FullOTA_PostValidate")
+
   def IncrementalOTA_Assertions(self):
     """Called after emitting the block of assertions at the top of an
     incremental OTA package.  Implementations can add whatever
@@ -1460,7 +1460,7 @@ fi
   # The install script location moved from /system/etc to /system/bin
   # in the L release.  Parse the init.rc file to find out where the
   # target-files expects it to be, and put it there.
-  sh_location = "etc/install-recovery.sh"
+  sh_location = "bin/install-recovery.sh"
   try:
     with open(os.path.join(input_dir, "BOOT", "RAMDISK", "init.rc")) as f:
       for line in f:
