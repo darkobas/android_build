@@ -161,6 +161,7 @@ function setpaths()
         export ANDROID_TOOLCHAIN_2ND_ARCH=$gccprebuiltdir/$toolchaindir2
     fi
 
+
     unset ANDROID_KERNEL_TOOLCHAIN_PATH
     case $ARCH in
         arm)
