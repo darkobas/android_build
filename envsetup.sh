@@ -1446,6 +1446,58 @@ function pez {
     return $retval
 }
 
+function cmremote()
+{
+    git remote rm cmremote 2> /dev/null
+    GERRIT_REMOTE=$(git config --get remote.github.projectname)
+    if [ -z "$GERRIT_REMOTE" ]
+    then
+        echo Unable to set up the git remote, are you under a git repo?
+        return 0
+    fi
+    CMUSER=$(git config --get review.review.cyanogenmod.org.username)
+    if [ -z "$CMUSER" ]
+    then
+        git remote add cmremote ssh://review.cyanogenmod.org:29418/$GERRIT_REMOTE
+    else
+        git remote add cmremote ssh://$CMUSER@review.cyanogenmod.org:29418/$GERRIT_REMOTE
+    fi
+    echo You can now push to "cmremote".
+}
+
+function cafremote()
+{
+    git remote rm caf 2> /dev/null
+    if [ ! -d .git ]
+    then
+        echo .git directory not found. Please run this from the root directory of the Android repository you wish to set up.
+    fi
+    PROJECT=`pwd -P | sed s#$ANDROID_BUILD_TOP/##g`
+    if (echo $PROJECT | grep -qv "^device")
+    then
+        PFX="platform/"
+    fi
+    git remote add caf git://codeaurora.org/$PFX$PROJECT
+    echo "Remote 'caf' created"
+}
+
+function aospremote()
+{
+    git remote rm aosp 2> /dev/null
+    if [ ! -d .git ]
+    then
+        echo .git directory not found. Please run this from the root directory of the Android repository you wish to set up.
+    fi
+    PROJECT=`pwd -P | sed s#$ANDROID_BUILD_TOP/##g`
+    if (echo $PROJECT | grep -qv "^device")
+    then
+        PFX="platform/"
+    fi
+    git remote add aosp https://android.googlesource.com/$PFX$PROJECT
+    echo "Remote 'aosp' created"
+}
+
+
 function get_make_command()
 {
   echo command make
