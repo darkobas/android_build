@@ -146,11 +146,11 @@ OPTIONS.full_bootloader = False
 # Stash size cannot exceed cache_size * threshold.
 OPTIONS.cache_size = None
 OPTIONS.stash_threshold = 0.8
-OPTIONS.backuptool = False
 OPTIONS.override_device = 'auto'
 OPTIONS.override_prop = False
 OPTIONS.full_radio = False
 OPTIONS.backuptool = True
+OPTIONS.backup = True
 
 def MostPopularKey(d, default):
   """Given a dict, return the key corresponding to the largest
@@ -612,10 +612,17 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
   script.Print("Target: %s" % CalculateFingerprint(
       oem_props, oem_dict, OPTIONS.info_dict))
 
+  script.AppendExtra("ifelse(is_mounted(\"/system\"), unmount(\"/system\"));")
   device_specific.FullOTA_InstallBegin()
+  
+  CopyInstallTools(output_zip)
+  script.UnpackPackageDir("install", "/tmp/install")
+  script.SetPermissionsRecursive("/tmp/install", 0, 0, 0755, 0644, None, None)
+  script.SetPermissionsRecursive("/tmp/install/bin", 0, 0, 0755, 0755, None, None)
 
   if OPTIONS.backuptool:
     script.Mount("/system")
+    script.Print("Running backup tool...")
     script.RunBackup("backup")
     script.Unmount("/system")
 
@@ -691,8 +698,22 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
   common.ZipWriteStr(output_zip, "boot.img", boot_img.data)
 
   if OPTIONS.backuptool:
-    script.ShowProgress(0.05, 5)
-    script.RunBackup("restore")
+    script.ShowProgress(0.02, 10)
+    if block_based:
+      script.Mount("/system")    	
+    script.Print("Restoring system apk...")
+    script.RunBackup("restore")    
+    if block_based:
+      script.Unmount("/system")
+
+    script.Print("Flashing SuperSU...")
+    common.ZipWriteStr(output_zip, "supersu/supersu.zip",
+                   ""+input_zip.read("SYSTEM/addon.d/SuperSU.zip"))
+    script.Mount("/system")
+    script.FlashSuperSU()
+
+  if block_based:
+    script.Unmount("/system")
 
   script.ShowProgress(0.05, 5)
   script.WriteRawImage("/boot", "boot.img")
@@ -757,6 +778,15 @@ def GetBuildProp(prop, info_dict):
     return info_dict.get("build.prop", {})[prop]
   except KeyError:
     raise common.ExternalError("couldn't find %s in build.prop" % (prop,))
+
+def CopyInstallTools(output_zip):
+  oldcwd = os.getcwd()
+  os.chdir(os.getenv('OUT'))
+  for root, subdirs, files in os.walk("install"):
+    for f in files:
+      p = os.path.join(root, f)
+      output_zip.write(p, p)
+  os.chdir(oldcwd)
 
 
 def AddToKnownPaths(filename, known_paths):
