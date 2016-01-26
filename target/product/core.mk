@@ -36,6 +36,7 @@ PRODUCT_PACKAGES += \
     Exchange2 \
     ExternalStorageProvider \
     FusedLocation \
+    Gallery2 \
     InputDevices \
     KeyChain \
     Keyguard \
