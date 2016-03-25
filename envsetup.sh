@@ -1448,21 +1448,20 @@ function pez {
 
 function cmremote()
 {
-    git remote rm cmremote 2> /dev/null
-    GERRIT_REMOTE=$(git config --get remote.github.projectname)
-    if [ -z "$GERRIT_REMOTE" ]
+    local proj pfx project
+
+    if ! git rev-parse &> /dev/null
     then
-        echo Unable to set up the git remote, are you under a git repo?
-        return 0
+        echo "Not in a git directory. Please run this from an Android repository you wish to set up."
+        return
     fi
-    CMUSER=$(git config --get review.review.cyanogenmod.org.username)
-    if [ -z "$CMUSER" ]
-    then
-        git remote add cmremote ssh://review.cyanogenmod.org:29418/$GERRIT_REMOTE
-    else
-        git remote add cmremote ssh://$CMUSER@review.cyanogenmod.org:29418/$GERRIT_REMOTE
-    fi
-    echo You can now push to "cmremote".
+    git remote rm cm 2> /dev/null
+
+    proj="$(pwd -P | sed "s#$ANDROID_BUILD_TOP/##g")"
+    pfx="android_"
+    project="${proj//\//_}"
+    git remote add cm "git@github.com:CyanogenMod/$pfx$project"
+    echo "Remote 'cm' created"
 }
 
 function cafremote()
