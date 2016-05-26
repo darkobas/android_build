@@ -83,6 +83,21 @@ else
     # This value will always be 0 for release builds.
     PLATFORM_PREVIEW_SDK_VERSION := 0
   endif
+
+ifeq "" "$(PLATFORM_SECURITY_PATCH)"
+  # Used to indicate the security patch that has been applied to the device.
+  # Can be an arbitrary string, but must be a single word.
+  #
+  # If there is no $PLATFORM_SECURITY_PATCH set, keep it empty.
+  PLATFORM_SECURITY_PATCH := 2016-07-05
+endif
+
+ifeq "" "$(PLATFORM_BASE_OS)"
+  # Used to indicate the base os applied to the device.
+  # Can be an arbitrary string, but must be a single word.
+  #
+  # If there is no $PLATFORM_BASE_OS set, keep it empty.
+  PLATFORM_BASE_OS :=
 endif
 
 ifeq "" "$(DEFAULT_APP_TARGET_SDK)"
@@ -103,7 +118,7 @@ ifeq "" "$(PLATFORM_SECURITY_PATCH)"
   # Can be an arbitrary string, but must be a single word.
   #
   # If there is no $PLATFORM_SECURITY_PATCH set, keep it empty.
-  PLATFORM_SECURITY_PATCH := 2016-06-01
+  PLATFORM_SECURITY_PATCH := 2016-07-05
 endif
 
 ifeq "" "$(PLATFORM_BASE_OS)"
