@@ -83,6 +83,7 @@ else
     # This value will always be 0 for release builds.
     PLATFORM_PREVIEW_SDK_VERSION := 0
   endif
+endif
 
 ifeq "" "$(PLATFORM_SECURITY_PATCH)"
   # Used to indicate the security patch that has been applied to the device.
